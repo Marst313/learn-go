@@ -103,7 +103,7 @@ jobs:
           envs: GITHUB_TOKEN,IMAGE_NAME,REGISTRY # kirim env ke SSH session
           script: |
             # Masuk ke folder aplikasi
-            cd /opt/your-app
+            cd /home/marst/server-go
             
             # Login ke registry untuk pull image
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
