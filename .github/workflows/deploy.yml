@@ -1,0 +1,121 @@
+name: CI/CD Pipeline
+
+# Trigger: push ke main/develop atau pull request ke main
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Environment variables global
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Testing
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      # Clone repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true  # Cache dependencies untuk speed
+
+      # Download semua dependencies
+      - name: Download dependencies
+        run: go mod download
+
+      # Jalankan semua tests
+      - name: Run tests
+        run: go test -v ./...
+
+      # Static analysis
+      - name: Run go vet
+        run: go vet ./...
+
+  # Job 2: Build Docker image (hanya untuk push ke main)
+  build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test  # Tunggu test selesai dulu
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write  # Permission untuk push ke registry
+
+    steps:
+      # Clone repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Login ke GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}  # Auto-provided token
+
+      # Generate tags untuk Docker image
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build dan push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # Job 3: Deploy ke VPS (hanya untuk push ke main)
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build  # Tunggu build selesai dulu
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      # SSH ke VPS dan jalankan deployment script
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}          # IP VPS
+          username: ${{ secrets.VPS_USERNAME }}  # SSH username
+          key: ${{ secrets.VPS_SSH_KEY }}        # SSH private key
+          port: ${{ secrets.VPS_PORT }}          # SSH port (22)
+          envs: GITHUB_TOKEN,IMAGE_NAME,REGISTRY # kirim env ke SSH session
+          script: |
+            # Masuk ke folder aplikasi
+            cd /opt/your-app
+            
+            # Login ke registry untuk pull image
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull image terbaru
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            
+            # Stop container lama (|| true = jangan fail kalau belum ada container)
+            docker-compose down || true
+            
+            # Start container baru
+            docker-compose up -d
+            
+            # Cleanup image lama untuk hemat disk space
+            docker image prune -af

@@ -1,0 +1,72 @@
+services:
+  # Service aplikasi utama
+  app:
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    container_name: golang-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # Port mapping: host:container
+    env_file:
+      - .env  # Load environment variables dari file
+    environment:
+      - TZ=Asia/Jakarta  # Set timezone
+    networks:
+      - app-network
+    depends_on:
+      - db  # Start database dulu sebelum app
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}      # Default: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-myapp}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data  # Persist data
+    ports:
+      - "5432:5432"  # Uncomment untuk akses dari luar (dev only)
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis untuk caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+# Network untuk komunikasi antar container
+networks:
+  app-network:
+    driver: bridge
+
+# Volume untuk persist data
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
