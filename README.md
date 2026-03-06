@@ -4,7 +4,7 @@ Proyek ini dibuat untuk belajar Golang melalui pembuatan REST API.
 
 ## 📋 Prerequisites
 
-- Go 1.21 atau lebih tinggi
+- Go 1.25 atau lebih tinggi
 - Docker & Docker Compose (untuk deployment)
 - PostgreSQL (atau gunakan Docker)
 - Air (untuk hot reload development)
