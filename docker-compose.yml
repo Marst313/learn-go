@@ -5,7 +5,7 @@ services:
     container_name: golang-api
     restart: unless-stopped
     ports:
-      - "8080:8080"  # Port mapping: host:container
+      - "80:8080"  # Port mapping: host:container
     env_file:
       - .env  # Load environment variables dari file
     environment:
