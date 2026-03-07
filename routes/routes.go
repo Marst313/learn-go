@@ -16,6 +16,6 @@ func RegisterRoutes(router *gin.Engine) {
 	}
 
 	router.NoRoute(func(c *gin.Context) {
-		utils.JSONError(c, http.StatusNotFound, "Not found")
+		utils.JSONError(c, http.StatusNotFound, "Not found ini coba testing ci/cd")
 	})
 }
