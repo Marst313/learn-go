@@ -5,7 +5,7 @@ services:
     container_name: golang-api
     restart: unless-stopped
     ports:
-      - "80:8080"  # Port mapping: host:container
+      - "10080:8080"  # Port mapping: host:container
     env_file:
       - .env  # Load environment variables dari file
     environment:
@@ -29,11 +29,11 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}      # Default: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-myapp}
+      POSTGRES_DB: ${DB_NAME:-reminder_app}
     volumes:
       - postgres-data:/var/lib/postgresql/data  # Persist data
-    ports:
-      - "5432:5432"  # Uncomment untuk akses dari luar (dev only)
+    # ports:
+      # - "5432:5432"
     networks:
       - app-network
     healthcheck:
