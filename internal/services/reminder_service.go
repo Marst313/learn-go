@@ -12,17 +12,19 @@ import (
 	"github.com/Marst/reminder-app/internal/utils"
 )
 
-func GetReminders(ctx context.Context, userId int) (*[]models.ReminderResponse, error) {
+func GetReminders(ctx context.Context, userId int, limit int, offset int) (*[]models.ReminderResponse, int, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	rows, err := database.DB.QueryContext(ctx, `SELECT id, title, description, category, is_completed, priority, recurring, time, date
 	FROM reminders
-	WHERE user_id = $1`,
-		userId)
+	WHERE user_id = $1 
+	ORDER BY time asc
+	LIMIT $2 OFFSET $3;`,
+		userId, limit, offset)
 
 	if err != nil {
-		return nil, errors.New("Failed to fetch reminder")
+		return nil, 0, 0, errors.New("Failed to fetch reminder")
 	}
 
 	defer rows.Close()
@@ -45,13 +47,26 @@ func GetReminders(ctx context.Context, userId int) (*[]models.ReminderResponse, 
 
 		if err != nil {
 			fmt.Println(err)
-			return nil, errors.New("Failed to scan reminders")
+			return nil, 0, 0, errors.New("Failed to scan reminders")
 		}
 
 		reminders = append(reminders, r)
 	}
 
-	return &reminders, nil
+	var total int
+	err = database.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM reminders WHERE user_id = $1", userId).Scan(&total)
+	if err != nil {
+		return nil, 0, 0, errors.New("Failed to count reminders")
+	}
+
+	var active int
+	err = database.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM reminders WHERE user_id = $1 AND is_completed = false", userId).Scan(&active)
+
+	if err != nil {
+		return nil, 0, 0, errors.New("Failed to get active reminders")
+	}
+
+	return &reminders, total, active, nil
 
 }
 

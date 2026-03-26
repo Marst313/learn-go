@@ -17,16 +17,45 @@ func GetReminders(c *gin.Context) {
 		return
 	}
 
-	reminders, err := services.GetReminders(c.Request.Context(), userId.(int))
+	limit := c.Query("limit")
+	offset := c.Query("offset")
+
+	if limit == "" {
+		limit = "10"
+	}
+
+	if offset == "" {
+		offset = "0"
+	}
+
+	limitInt, err := strconv.ParseInt(limit, 10, 32)
+	if err != nil {
+		utils.JSONError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	offsetInt, err := strconv.ParseInt(offset, 10, 32)
+	if err != nil {
+		utils.JSONError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	reminders, total, active, err := services.GetReminders(c.Request.Context(), userId.(int), int(limitInt), int(offsetInt))
 
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.JSONSuccess(c, http.StatusOK, "Successfully get all reminders!", gin.H{
-		"results": len(*reminders),
-		"data":    reminders,
+	utils.JSONSuccess(c, http.StatusOK, "Successfully get all reminders!", models.GetReminderResponse{
+		Total:     total,
+		Active:    active,
+		Reminders: reminders,
+		Results:   len(*reminders),
+		Pagination: models.Page{
+			Limit:  int(limitInt),
+			Offset: int(offsetInt),
+		},
 	})
 }
 

@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/Marst/reminder-app/internal/cron"
 	"github.com/Marst/reminder-app/internal/database"
 	"github.com/Marst/reminder-app/routes"
 	"github.com/gin-contrib/cors"
@@ -43,10 +49,20 @@ func main() {
 		log.Fatal("Migration failed", err)
 	}
 
+	// ! 6. SETUP CRON SCHEDULER
+	scheduler := cron.NewScheduler()
+
+	err = scheduler.RegisterJobs()
+	if err != nil {
+		log.Fatal("Failed to register cron jobs : ", err)
+	}
+	scheduler.Start()
+
+	// ! 7. SETUP GIN ROUTER
 	router := gin.Default()
 	router.SetTrustedProxies([]string{"http://localhost:5173"})
 
-	// ! 6. CORS
+	// ! 8. CORS
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -54,13 +70,38 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// ! 7. Router
+	// ! 9. Router
 	routes.RegisterRoutes(router)
 
-	log.Printf("🚀 Server running on http://localhost:%s", port)
-
-	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
+	// ! 10. SETUP HTTP SERVER
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
 	}
+	go func() {
+		log.Printf("🚀 Server running on http://localhost:%s", port)
+
+		err := srv.ListenAndServe()
+		if err != nil {
+			log.Fatal("Failed to start server:", err)
+		}
+	}()
+
+	// ! 11. GRACEFUL SHUTDOWN
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutting down server...")
+	scheduler.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = srv.Shutdown(ctx)
+	if err != nil {
+		log.Fatal("Server forced to shudown:", err)
+	}
+	log.Println("Server exited properly")
 
 }

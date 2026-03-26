@@ -33,3 +33,16 @@ type ReminderResponse struct {
 type ReminderToggleComplete struct {
 	IsCompleted bool `json:"is_completed" gorm:"not null"`
 }
+
+type Page struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
+type GetReminderResponse struct {
+	Total      int                 `json:"total"`
+	Active     int                 `json:"active"`
+	Results    int                 `json:"results"`
+	Pagination Page                `json:"pagination"`
+	Reminders  *[]ReminderResponse `json:"reminders"`
+}

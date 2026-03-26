@@ -91,12 +91,12 @@ docker-run:
 
 # Start semua services
 compose-up:
-	docker-compose up -d
+	docker compose up -d
 
 # Stop semua services
 compose-down:
-	docker-compose down
+	docker compose down
 
 # View logs dari semua services
 compose-logs:
-	docker-compose logs -f
+	docker compose logs -f
